@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paper Attempts Tracker — CBSE Class 10</title>
+  <meta name="description" content="Track CBSE Class 10 paper attempts, view performance metrics, and analyse subject-wise progress with charts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">📚</span>
+      <div>
+        <div class="brand-title">PaperTrack</div>
+        <div class="brand-sub">CBSE Class 10</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-tab="dashboard" id="nav-dashboard">
+        <span class="nav-icon">📊</span> Dashboard
+      </a>
+      <a href="#" class="nav-item" data-tab="ai" id="nav-ai">
+        <span class="nav-icon">🤖</span> AI Insights
+      </a>
+      <a href="#" class="nav-item" data-tab="records" id="nav-records">
+        <span class="nav-icon">📋</span> Records
+      </a>
+      <a href="#" class="nav-item" data-tab="add" id="nav-add">
+        <span class="nav-icon">➕</span> Add Attempt
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="theme-toggle-wrap">
+        <span>🌙</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="themeToggle" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span>☀️</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main-content">
+
+    <!-- ══ TAB: DASHBOARD ══ -->
+    <section class="tab-section active" id="tab-dashboard">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <p class="page-subtitle">Your performance at a glance</p>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card" id="statTotal">
+          <div class="stat-icon">🗂️</div>
+          <div class="stat-value" id="statTotalVal">—</div>
+          <div class="stat-label">Total Attempts</div>
+        </div>
+        <div class="stat-card" id="statAvg">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="statAvgVal">—</div>
+          <div class="stat-label">Overall Avg Marks</div>
+        </div>
+        <div class="stat-card best-card" id="statBest">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-value" id="statBestVal">—</div>
+          <div class="stat-label">Best Score</div>
+          <div class="stat-detail" id="statBestDetail"></div>
+        </div>
+        <div class="stat-card worst-card" id="statWorst">
+          <div class="stat-icon">📉</div>
+          <div class="stat-value" id="statWorstVal">—</div>
+          <div class="stat-label">Lowest Score</div>
+          <div class="stat-detail" id="statWorstDetail"></div>
+        </div>
+      </div>
+
+      <!-- Charts Row 1 -->
+      <div class="charts-row">
+        <div class="chart-card wide">
+          <div class="chart-header">
+            <h2 class="chart-title">📈 Performance Trend</h2>
+            <div class="chart-filter">
+              <select id="trendSubjectFilter">
+                <option value="all">All Subjects</option>
+                <option value="Science">Science</option>
+                <option value="Math">Math</option>
+                <option value="SST">SST</option>
+                <option value="English">English</option>
+                <option value="Hindi">Hindi</option>
+              </select>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h2 class="chart-title">🕸️ Subject Strengths</h2>
+          </div>
+          <div class="chart-container">
+            <canvas id="radarChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row 2 -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-header">
+            <h2 class="chart-title">📊 Subject Comparison</h2>
+          </div>
+          <div class="chart-container">
+            <canvas id="barChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h2 class="chart-title">📋 Paper Type Breakdown</h2>
+          </div>
+          <div class="chart-container">
+            <canvas id="doughnutChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Bars -->
+      <div class="chart-card progress-card">
+        <div class="chart-header">
+          <h2 class="chart-title">🎯 Progress to 80 Marks (Target)</h2>
+        </div>
+        <div id="progressBars"></div>
+      </div>
+
+      <!-- Recent Attempts -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2 class="chart-title">🕒 Recent Attempts</h2>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="recentTable">
+            <thead>
+              <tr>
+                <th>Date</th><th>Subject</th><th>Type</th><th>Paper #</th><th>Marks</th><th>%</th>
+              </tr>
+            </thead>
+            <tbody id="recentTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ══ TAB: AI INSIGHTS ══ -->
+    <section class="tab-section" id="tab-ai">
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div>
+          <h1>AI Insights & Coaching</h1>
+          <p class="page-subtitle">Personalized diagnostic coaching, board score predictions, and adaptive study plans</p>
+        </div>
+        <button class="btn btn-primary" id="refreshAllAiBtn">
+          <span>⚡</span> Refresh All AI
+        </button>
+      </div>
+
+      <!-- 1. AI PERFORMANCE COACH PANEL -->
+      <div class="ai-panel ai-panel-coach" id="aiCoachPanel">
+        <div class="ai-panel-header">
+          <div class="ai-title-row">
+            <span class="ai-icon">🤖</span>
+            <div>
+              <h2 class="chart-title" style="margin:0">AI Performance Coach</h2>
+              <p class="ai-section-sub">Diagnostic evaluation, grade assessments, and subject guidance</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="ai-model-badge" id="coachModelBadge"></span>
+            <button class="btn btn-ghost btn-sm" id="refreshCoachBtn" title="Refresh Performance Coach">
+              <span id="refreshCoachIcon">🔄</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="ai-loading" id="coachLoading">
+          <div class="ai-spinner"></div>
+          <p>Analyzing overall diagnostics with AI…</p>
+        </div>
+
+        <div class="ai-error hidden" id="coachError">
+          <span class="ai-error-icon">⚠️</span>
+          <div>
+            <strong id="coachErrorMsg">Could not load AI coach insights.</strong>
+            <p id="coachErrorHint" class="ai-error-hint"></p>
+          </div>
+        </div>
+
+        <div class="ai-nodata hidden" id="coachNoData">
+          <span style="font-size:32px">📭</span>
+          <p>Add some paper attempts first to view AI coaching diagnostics.</p>
+        </div>
+
+        <div class="ai-results hidden" id="coachResults">
+          <div class="ai-overall" id="aiOverall"></div>
+          <div class="ai-subjects-grid" id="aiSubjectsGrid"></div>
+          <div class="ai-footer" id="coachFooter"></div>
+        </div>
+      </div>
+
+      <!-- 2. CBSE BOARD SCORE PREDICTOR PANEL -->
+      <div class="ai-panel ai-panel-predictor" id="aiPredictorPanel">
+        <div class="ai-panel-header">
+          <div class="ai-title-row">
+            <span class="ai-icon">🔮</span>
+            <div>
+              <h2 class="chart-title" style="margin:0">CBSE Board Exam Score Predictor</h2>
+              <p class="ai-section-sub">Projected exam scores and grade trajectory based on attempt progression</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="ai-model-badge" id="predictorModelBadge"></span>
+            <button class="btn btn-ghost btn-sm" id="refreshPredictorBtn" title="Refresh Score Predictions">
+              <span id="refreshPredictorIcon">🔄</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="ai-loading" id="predictorLoading">
+          <div class="ai-spinner"></div>
+          <p>Calculating board score projections with AI…</p>
+        </div>
+
+        <div class="ai-error hidden" id="predictorError">
+          <span class="ai-error-icon">⚠️</span>
+          <div>
+            <strong id="predictorErrorMsg">Could not calculate projections.</strong>
+            <p id="predictorErrorHint" class="ai-error-hint"></p>
+          </div>
+        </div>
+
+        <div class="ai-nodata hidden" id="predictorNoData">
+          <span style="font-size:32px">📭</span>
+          <p>Add paper attempts to calculate score projections.</p>
+        </div>
+
+        <div class="ai-results hidden" id="predictorResults">
+          <div class="ai-predictor-overview" id="predictorOverview"></div>
+          <div class="ai-predictor-grid" id="aiScorePredictorGrid"></div>
+          <div class="ai-footer" id="predictorFooter"></div>
+        </div>
+      </div>
+
+      <!-- 3. RECURRING MISTAKE PATTERN DETECTOR PANEL -->
+      <div class="ai-panel ai-panel-patterns" id="aiPatternsPanel">
+        <div class="ai-panel-header">
+          <div class="ai-title-row">
+            <span class="ai-icon">🔍</span>
+            <div>
+              <h2 class="chart-title" style="margin:0">Cross-Paper Blind Spot & Pattern Detector</h2>
+              <p class="ai-section-sub">Cross-paper analysis detecting repeated slip-ups and targeted remedies</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="ai-model-badge" id="patternsModelBadge"></span>
+            <button class="btn btn-ghost btn-sm" id="refreshPatternsBtn" title="Refresh Pattern Detection">
+              <span id="refreshPatternsIcon">🔄</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="ai-loading" id="patternsLoading">
+          <div class="ai-spinner"></div>
+          <p>Scanning comments and past attempts for recurring patterns…</p>
+        </div>
+
+        <div class="ai-error hidden" id="patternsError">
+          <span class="ai-error-icon">⚠️</span>
+          <div>
+            <strong id="patternsErrorMsg">Could not analyze mistake patterns.</strong>
+            <p id="patternsErrorHint" class="ai-error-hint"></p>
+          </div>
+        </div>
+
+        <div class="ai-nodata hidden" id="patternsNoData">
+          <span style="font-size:32px">📭</span>
+          <p>Add attempts with notes to detect recurring error patterns.</p>
+        </div>
+
+        <div class="ai-results hidden" id="patternsResults">
+          <div class="ai-top-blindspot" id="patternsTopBanner"></div>
+          <div class="ai-patterns-grid" id="aiMistakePatternsGrid"></div>
+          <div class="ai-footer" id="patternsFooter"></div>
+        </div>
+      </div>
+
+      <!-- 4. 7-DAY ADAPTIVE AI STUDY PLAN PANEL -->
+      <div class="ai-panel ai-panel-planner" id="aiPlannerPanel">
+        <div class="ai-panel-header">
+          <div class="ai-title-row">
+            <span class="ai-icon">📅</span>
+            <div>
+              <h2 class="chart-title" style="margin:0">7-Day Adaptive AI Study Plan</h2>
+              <p class="ai-section-sub">Daily targeted schedule tailored to eliminate your highest-impact weaknesses</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="ai-model-badge" id="plannerModelBadge"></span>
+            <button class="btn btn-ghost btn-sm" id="refreshPlannerBtn" title="Refresh Study Plan">
+              <span id="refreshPlannerIcon">🔄</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="ai-loading" id="plannerLoading">
+          <div class="ai-spinner"></div>
+          <p>Generating personalized 7-day study timetable…</p>
+        </div>
+
+        <div class="ai-error hidden" id="plannerError">
+          <span class="ai-error-icon">⚠️</span>
+          <div>
+            <strong id="plannerErrorMsg">Could not generate study plan.</strong>
+            <p id="plannerErrorHint" class="ai-error-hint"></p>
+          </div>
+        </div>
+
+        <div class="ai-nodata hidden" id="plannerNoData">
+          <span style="font-size:32px">📭</span>
+          <p>Add paper attempts to generate a tailored study plan.</p>
+        </div>
+
+        <div class="ai-results hidden" id="plannerResults">
+          <div class="ai-planner-goal" id="plannerGoalBanner"></div>
+          <div class="ai-planner-grid" id="aiStudyPlannerGrid"></div>
+          <div class="ai-footer" id="plannerFooter"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ TAB: RECORDS ══ -->
+    <section class="tab-section" id="tab-records">
+      <div class="page-header">
+        <h1>All Records</h1>
+        <p class="page-subtitle">Browse, filter, edit and delete your attempts</p>
+      </div>
+
+      <div class="filter-bar">
+        <select id="filterSubject" class="filter-select">
+          <option value="">All Subjects</option>
+          <option value="Science">Science</option>
+          <option value="Math">Math</option>
+          <option value="SST">SST</option>
+          <option value="English">English</option>
+          <option value="Hindi">Hindi</option>
+        </select>
+        <select id="filterType" class="filter-select">
+          <option value="">All Types</option>
+          <option value="Educart Sample Paper">Educart Sample Papers</option>
+          <option value="PYQ">PYQs</option>
+        </select>
+        <input type="date" id="filterFrom" class="filter-input" placeholder="From" title="From date" />
+        <input type="date" id="filterTo" class="filter-input" placeholder="To" title="To date" />
+        <button class="btn btn-primary" id="applyFiltersBtn">Filter</button>
+        <button class="btn btn-ghost" id="clearFiltersBtn">Clear</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table" id="recordsTable">
+          <thead>
+            <tr>
+              <th>ID</th><th>Date</th><th>Subject</th><th>Type</th>
+              <th>Paper #</th><th>Marks</th><th>%</th><th>Comments</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTableBody"></tbody>
+        </table>
+        <div id="noRecords" class="no-data hidden">No records found.</div>
+      </div>
+    </section>
+
+    <!-- ══ TAB: ADD / EDIT ATTEMPT ══ -->
+    <section class="tab-section" id="tab-add">
+      <div class="page-header">
+        <h1 id="formTitle">Add New Attempt</h1>
+        <p class="page-subtitle" id="formSubtitle">Fill in the details below to log a paper attempt</p>
+      </div>
+
+      <div class="form-card">
+        <form id="attemptForm" novalidate>
+          <input type="hidden" id="editId" />
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="formSubject">Subject <span class="required">*</span></label>
+              <select id="formSubject" required>
+                <option value="">— Select Subject —</option>
+                <option value="Science">Science</option>
+                <option value="Math">Math</option>
+                <option value="SST">SST</option>
+                <option value="English">English</option>
+                <option value="Hindi">Hindi</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="formPaperType">Paper Type <span class="required">*</span></label>
+              <select id="formPaperType" required>
+                <option value="">— Select Type —</option>
+                <option value="Educart Sample Paper">Educart Sample Paper</option>
+                <option value="PYQ">PYQ (Previous Year Question)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="formPaperNumber">Paper Number <span class="required">*</span></label>
+              <input type="text" id="formPaperNumber" placeholder="e.g. 1, 2, 3 or 30/2/1" required />
+              <span class="form-hint" id="paperNumberHint">Enter numeric (1, 2…) for Sample Papers; code format (30/2/1) for PYQs</span>
+            </div>
+
+            <div class="form-group">
+              <label for="formDate">Date Attempted <span class="required">*</span></label>
+              <input type="date" id="formDate" required />
+            </div>
+
+            <div class="form-group">
+              <label for="formMarks">Marks Obtained <span class="required">*</span> <span class="form-hint">(out of 80)</span></label>
+              <input type="number" id="formMarks" min="0" max="80" step="0.5" placeholder="e.g. 67.5" required />
+              <div class="marks-preview" id="marksPreview"></div>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="formComments">Comments <span class="optional">(optional)</span></label>
+              <textarea id="formComments" rows="3" placeholder="Any notes about this attempt…"></textarea>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-large" id="submitBtn">
+              <span id="submitBtnText">➕ Add Attempt</span>
+            </button>
+            <button type="button" class="btn btn-ghost" id="cancelEditBtn" style="display:none">Cancel Edit</button>
+          </div>
+
+          <div id="formMessage" class="form-message hidden"></div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── MODAL: Confirm Delete ── -->
+  <div class="modal-overlay hidden" id="deleteModal">
+    <div class="modal">
+      <div class="modal-icon">🗑️</div>
+      <h3>Delete Attempt?</h3>
+      <p id="deleteModalDesc">This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+        <button class="btn btn-ghost" id="cancelDeleteBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
