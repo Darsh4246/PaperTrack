@@ -1,15 +1,18 @@
 services:
   # ── PaperTrack Web Application ─────────────────────────────────
   app:
-    build: .
+    build:
+      context: .
+      args:
+        PORT: ${PORT:-4000}
     container_name: papertrack-app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PORT:-4000}:${PORT:-4000}"
     environment:
       - NODE_ENV=production
       - HOST=0.0.0.0
-      - PORT=3000
+      - PORT=${PORT:-4000}
 
       # Database Configuration
       # (Defaults to host.docker.internal to connect to Postgres installed on host)
@@ -48,4 +51,3 @@ services:
 
 volumes:
   postgres_data:
-

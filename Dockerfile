@@ -11,12 +11,12 @@ RUN npm ci --omit=dev || npm install --omit=dev
 # Copy application files
 COPY . .
 
-# Expose web port
-EXPOSE 3000
-
-ENV NODE_ENV=production
+# Default to port 4000 (can be overridden via build args or environment)
+ARG PORT=4000
+ENV PORT=${PORT}
 ENV HOST=0.0.0.0
-ENV PORT=3000
+ENV NODE_ENV=production
+
+EXPOSE 4000
 
 CMD ["node", "server.js"]
-
