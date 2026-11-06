@@ -15,6 +15,7 @@ COPY . .
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh /etc/supervisor/conf.d/supervisord.conf \
+    && chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
