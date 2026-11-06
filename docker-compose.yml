@@ -1,53 +1,28 @@
 services:
-  # ── PaperTrack Web Application ─────────────────────────────────
-  app:
-    build:
-      context: .
-      args:
-        PORT: ${PORT:-4000}
-    container_name: papertrack-app
+  papertrack:
+    build: .
+    container_name: papertrack
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
-      - "${PORT:-4000}:${PORT:-4000}"
+      - "${PORT}:${PORT}"
     environment:
       - NODE_ENV=production
       - HOST=0.0.0.0
-      - PORT=${PORT:-4000}
-
-      # Database Configuration
-      # (Defaults to host.docker.internal to connect to Postgres installed on host)
-      - DB_HOST=${DB_HOST:-host.docker.internal}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-Darsh@123}
-      - DB_NAME=${DB_NAME:-DPS_Student_Details}
-
-      # Ollama AI Configuration (connects to Ollama on host machine)
-      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gpt-oss:20b-cloud}
-      - AI_CACHE_MINUTES=${AI_CACHE_MINUTES:-30}
-
-    # Enables communication with services running on host (Postgres & Ollama)
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  # ── Optional: Standalone PostgreSQL Database in Docker ──────────
-  # Run with: docker compose --profile with-db up
-  db:
-    image: postgres:16-alpine
-    container_name: papertrack-db
-    restart: unless-stopped
-    profiles:
-      - with-db
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_DB: DPS_Student_Details
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-Darsh@123}
+      - PORT=${PORT}
+      - DB_HOST=localhost
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:?set DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD}
+      - DB_NAME=${DB_NAME:?set DB_NAME}
+      - OLLAMA_URL=http://localhost:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:?set OLLAMA_MODEL}
+      - AI_CACHE_MINUTES=${AI_CACHE_MINUTES:?set AI_CACHE_MINUTES}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ollama_data:/root/.ollama
+      - ./init.sql:/docker-initdb/init.sql:ro
 
 volumes:
   postgres_data:
+  ollama_data:

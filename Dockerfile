@@ -1,22 +1,20 @@
-FROM node:20-alpine
+FROM node:20-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      postgresql supervisor curl ca-certificates zstd \
+    && ln -s "$(ls -d /usr/lib/postgresql/*)" /usr/lib/postgresql/current \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
 
 WORKDIR /app
-
-# Copy dependency manifests first for layer caching
 COPY package*.json ./
-
-# Install production dependencies
-RUN npm ci --omit=dev || npm install --omit=dev
-
-# Copy application files
+RUN npm ci --omit=dev
 COPY . .
 
-# Default to port 4000 (can be overridden via build args or environment)
-ARG PORT=4000
-ENV PORT=${PORT}
-ENV HOST=0.0.0.0
-ENV NODE_ENV=production
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-EXPOSE 4000
-
-CMD ["node", "server.js"]
+ENTRYPOINT ["/entrypoint.sh"]
