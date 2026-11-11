@@ -7,10 +7,10 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-// ── Ollama config ──────────────────────────────────
-const OLLAMA_URL   = (process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/$/, '');
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2';
-const AI_CACHE_MIN = parseInt(process.env.AI_CACHE_MINUTES) || 30;
+// ── Gemini config ──────────────────────────────────
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL   = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const AI_CACHE_MIN   = parseInt(process.env.AI_CACHE_MINUTES) || 30;
 
 // ── Separate in-memory AI caches ───────────────────
 const aiCaches = {
@@ -82,8 +82,11 @@ function repairTruncatedJSON(str) {
     if (ch === '}' || ch === ']') stack.pop();
   }
 
+  // Close any open string literal before closing brackets
+  let result = str.replace(/\\+$/, '');
+  if (inString) result += '"';
   // Remove trailing comma before we append closers
-  let result = str.replace(/,\s*$/, '');
+  result = result.replace(/,\s*$/, '');
   // Close all open structures in reverse order
   while (stack.length) result += stack.pop();
   return result;
@@ -291,42 +294,67 @@ ${comments || '(no comments recorded)'}`;
   return { attempts, subjectAvg, attemptsTimeline, subjectSummaries };
 }
 
-async function callOllamaJSON(prompt, numPredict = 2000) {
-  console.log(`🤖 Calling Ollama (${OLLAMA_MODEL})…`);
+async function callGeminiJSON(prompt, maxOutputTokens = 4096) {
+  if (!GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not configured. Set it in your environment variables.');
+  }
 
-  const ollamaRes = await fetch(`${OLLAMA_URL}/api/generate`, {
+  console.log(`🤖 Calling Gemini (${GEMINI_MODEL})…`);
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
+  const geminiRes = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': GEMINI_API_KEY,
+    },
     body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      prompt,
-      stream: false,
-      options: {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
         temperature: 0.3,
-        num_predict: numPredict,
+        maxOutputTokens: Math.max(maxOutputTokens, 16384),
+        responseMimeType: 'application/json',
       },
     }),
   });
 
-  if (!ollamaRes.ok) {
-    const errText = await ollamaRes.text();
-    throw new Error(`Ollama error ${ollamaRes.status}: ${errText}`);
+  if (!geminiRes.ok) {
+    const errText = await geminiRes.text();
+    let errDetail = errText;
+    try {
+      const errJson = JSON.parse(errText);
+      errDetail = errJson?.error?.message || errText;
+    } catch (_) {}
+    throw new Error(`Gemini API error ${geminiRes.status}: ${errDetail}`);
   }
 
-  const ollamaData = await ollamaRes.json();
-  const rawText = ollamaData.response || '';
+  const geminiData = await geminiRes.json();
+  const candidate = geminiData.candidates?.[0];
+  const rawText = (candidate?.content?.parts || [])
+    .filter(p => !p.thought && typeof p.text === 'string')
+    .map(p => p.text)
+    .join('');
 
-  // Strip <think>...</think> blocks from reasoning models
+  if (!rawText) {
+    const reason = candidate?.finishReason || geminiData.promptFeedback?.blockReason || 'empty response';
+    throw new Error(`Gemini returned no content (${reason}).`);
+  }
+
+  // Strip <think>...</think> blocks if present
   const cleanText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
   // Strip markdown code fences
   const fenceStripped = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
 
-  // Extract outermost JSON object
-  const jsonMatch = fenceStripped.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('AI returned no valid JSON. Raw: ' + fenceStripped.slice(0, 300));
+  // Extract JSON object (allow truncated output without closing brace so safeParseJSON can repair it)
+  const firstBrace = fenceStripped.indexOf('{');
+  if (firstBrace === -1) throw new Error('AI returned no valid JSON. Raw: ' + fenceStripped.slice(0, 300));
+  const lastBrace = fenceStripped.lastIndexOf('}');
+  const jsonCandidate = lastBrace > firstBrace
+    ? fenceStripped.slice(firstBrace, lastBrace + 1)
+    : fenceStripped.slice(firstBrace);
 
-  return safeParseJSON(jsonMatch[0]);
+  return safeParseJSON(jsonCandidate);
 }
 
 function checkCache(cacheKey, force) {
@@ -341,7 +369,7 @@ function checkCache(cacheKey, force) {
 
 function setCache(cacheKey, data) {
   aiCaches[cacheKey] = {
-    data: { ...data, status: 'ok', model: OLLAMA_MODEL, cached: false },
+    data: { ...data, status: 'ok', model: GEMINI_MODEL, cached: false },
     timestamp: Date.now(),
   };
 }
@@ -392,7 +420,7 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Only include attempted subjects.`;
 
-    const data = await callOllamaJSON(prompt, 1800);
+    const data = await callGeminiJSON(prompt, 4096);
     setCache('coach', data);
     res.json(aiCaches.coach.data);
   } catch (err) {
@@ -441,7 +469,7 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Ensure each attempted subject has an entry.`;
 
-    const data = await callOllamaJSON(prompt, 1500);
+    const data = await callGeminiJSON(prompt, 4096);
     setCache('predictions', data);
     res.json(aiCaches.predictions.data);
   } catch (err) {
@@ -488,7 +516,7 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Provide 3 to 5 realistic, high-impact recurring patterns.`;
 
-    const data = await callOllamaJSON(prompt, 1600);
+    const data = await callGeminiJSON(prompt, 4096);
     setCache('patterns', data);
     res.json(aiCaches.patterns.data);
   } catch (err) {
@@ -539,7 +567,7 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Generate 5 to 7 daily sessions. Keep tasks concrete and actionable.`;
 
-    const data = await callOllamaJSON(prompt, 1800);
+    const data = await callGeminiJSON(prompt, 4096);
     setCache('planner', data);
     res.json(aiCaches.planner.data);
   } catch (err) {
@@ -556,5 +584,5 @@ app.get('/{*path}', (req, res) => {
 app.listen(PORT, HOST, () => {
   console.log(`✅ Paper Attempts tracker running at http://localhost:${PORT}`);
   console.log(`🌐 Network accessible at http://${HOST}:${PORT}`);
-  console.log(`🤖 AI model: ${OLLAMA_MODEL} via ${OLLAMA_URL}`);
+  console.log(`🤖 AI model: ${GEMINI_MODEL} via Google Gemini API`);
 });
