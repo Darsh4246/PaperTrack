@@ -223,6 +223,157 @@ body {
 .tab-section.active { display: block; }
 
 /* ══════════════════════════════
+   EXAM COUNTDOWN BANNER
+══════════════════════════════ */
+.countdown-banner {
+  background: linear-gradient(135deg, rgba(108, 99, 255, 0.12), rgba(72, 207, 173, 0.08));
+  border: 1px solid rgba(108, 99, 255, 0.22);
+  border-radius: 20px;
+  padding: 22px 28px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.countdown-banner::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--brand-1), var(--brand-2), var(--brand-3));
+}
+
+.countdown-left {
+  flex: 1;
+  min-width: 240px;
+}
+
+.countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(108, 99, 255, 0.15);
+  color: var(--brand-1);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+
+.countdown-pulse {
+  width: 8px;
+  height: 8px;
+  background: var(--brand-1);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(108, 99, 255, 0.7);
+  animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(108, 99, 255, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(108, 99, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(108, 99, 255, 0); }
+}
+
+.countdown-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.countdown-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.countdown-timer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.countdown-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 18px;
+  min-width: 72px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.countdown-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.09);
+}
+
+.countdown-val {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.countdown-lbl {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.countdown-colon {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--brand-1);
+  opacity: 0.45;
+  user-select: none;
+  margin-top: -12px;
+}
+
+@media (max-width: 768px) {
+  .countdown-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+  .countdown-timer {
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .countdown-box {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 6px;
+  }
+  .countdown-val {
+    font-size: 24px;
+  }
+  .countdown-colon {
+    font-size: 20px;
+    margin-top: -8px;
+  }
+}
+
+/* ══════════════════════════════
    STAT CARDS
 ══════════════════════════════ */
 .stats-grid {
@@ -285,15 +436,30 @@ body {
 
 .chart-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .chart-title {
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
+}
+
+.chart-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.chart-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .chart-filter select {
@@ -304,6 +470,42 @@ body {
   background: var(--surface-2);
   color: var(--text);
   cursor: pointer;
+}
+
+/* ── Forecast Toggle ── */
+.forecast-toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.forecast-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.forecast-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.forecast-toggle input:checked + .forecast-toggle-pill {
+  background: rgba(108, 99, 255, 0.15);
+  color: var(--brand-1);
+  border-color: rgba(108, 99, 255, 0.4);
+  box-shadow: 0 0 10px rgba(108, 99, 255, 0.12);
 }
 
 .chart-container {

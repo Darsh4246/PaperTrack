@@ -60,6 +60,39 @@
         <p class="page-subtitle">Your performance at a glance</p>
       </div>
 
+      <!-- ── EXAM COUNTDOWN BANNER ── -->
+      <div class="countdown-banner" id="examCountdown">
+        <div class="countdown-left">
+          <div class="countdown-badge">
+            <span class="countdown-pulse"></span>
+            <span>Target: February 17, 2027</span>
+          </div>
+          <h2 class="countdown-title">🎯 CBSE Class 10 Board Exams</h2>
+          <p class="countdown-subtitle" id="countdownSubtitle">Countdown to the first paper — stay consistent!</p>
+        </div>
+        <div class="countdown-timer">
+          <div class="countdown-box">
+            <span class="countdown-val" id="cdDays">--</span>
+            <span class="countdown-lbl">Days</span>
+          </div>
+          <span class="countdown-colon">:</span>
+          <div class="countdown-box">
+            <span class="countdown-val" id="cdHours">--</span>
+            <span class="countdown-lbl">Hours</span>
+          </div>
+          <span class="countdown-colon">:</span>
+          <div class="countdown-box">
+            <span class="countdown-val" id="cdMins">--</span>
+            <span class="countdown-lbl">Minutes</span>
+          </div>
+          <span class="countdown-colon">:</span>
+          <div class="countdown-box">
+            <span class="countdown-val" id="cdSecs">--</span>
+            <span class="countdown-lbl">Seconds</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Stat Cards -->
       <div class="stats-grid" id="statsGrid">
         <div class="stat-card" id="statTotal">
@@ -90,8 +123,15 @@
       <div class="charts-row">
         <div class="chart-card wide">
           <div class="chart-header">
-            <h2 class="chart-title">📈 Performance Trend</h2>
+            <div>
+              <h2 class="chart-title">📈 Performance Trend & Forecast</h2>
+              <div class="chart-subtitle">Historical attempts & trajectory to Feb 17 Board Exams</div>
+            </div>
             <div class="chart-filter">
+              <label class="forecast-toggle" title="Toggle exam trajectory forecast">
+                <input type="checkbox" id="trendForecastToggle" checked />
+                <span class="forecast-toggle-pill">🔮 Forecast</span>
+              </label>
               <select id="trendSubjectFilter">
                 <option value="all">All Subjects</option>
                 <option value="Science">Science</option>

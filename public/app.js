@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initForm();
   initFilters();
   initDeleteModal();
+  initCountdown();
   loadDashboard();
 });
 
@@ -96,6 +97,48 @@ function switchTab(tab) {
 }
 
 // ══════════════════════════════════════════════
+// EXAM COUNTDOWN TIMER
+// ══════════════════════════════════════════════
+function initCountdown() {
+  const target = new Date('2027-02-17T09:00:00+05:30').getTime();
+
+  function tick() {
+    const now = Date.now();
+    const diff = target - now;
+
+    const daysEl = document.getElementById('cdDays');
+    const hoursEl = document.getElementById('cdHours');
+    const minsEl = document.getElementById('cdMins');
+    const secsEl = document.getElementById('cdSecs');
+    const subEl = document.getElementById('countdownSubtitle');
+
+    if (!daysEl || !hoursEl || !minsEl || !secsEl) return;
+
+    if (diff <= 0) {
+      daysEl.textContent = '00';
+      hoursEl.textContent = '00';
+      minsEl.textContent = '00';
+      secsEl.textContent = '00';
+      if (subEl) subEl.textContent = '🎉 Board exams have begun! Give it your best!';
+      return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const mins = Math.floor((diff / (1000 * 60)) % 60);
+    const secs = Math.floor((diff / 1000) % 60);
+
+    daysEl.textContent = String(days).padStart(2, '0');
+    hoursEl.textContent = String(hours).padStart(2, '0');
+    minsEl.textContent = String(mins).padStart(2, '0');
+    secsEl.textContent = String(secs).padStart(2, '0');
+  }
+
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ══════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════
 async function loadDashboard() {
@@ -136,13 +179,87 @@ function populateStats(data) {
   }
 }
 
+/**
+ * Calculates a linear trendline and forecast points for a set of attempts.
+ * @param {Array<{ x: Date, y: number }>} points Sorted chronologically.
+ * @param {Date} targetExamDate Target Board Exam date (e.g. 2027-02-17).
+ * @returns {Array<{ x: Date, y: number, isExamDay?: boolean }>}
+ */
+function computeForecastPoints(points, targetExamDate) {
+  if (!points || points.length === 0) return [];
+
+  const lastPoint = points[points.length - 1];
+  const lastTime = lastPoint.x.getTime();
+  const examTime = targetExamDate.getTime();
+
+  // If last attempt is already at or past exam date, no forecast needed
+  if (lastTime >= examTime) return [];
+
+  let slope = 0; // marks per day
+  if (points.length >= 2) {
+    const t0 = points[0].x.getTime();
+    const dayMs = 1000 * 60 * 60 * 24;
+
+    const tValues = points.map(p => (p.x.getTime() - t0) / dayMs);
+    const yValues = points.map(p => p.y);
+    const n = points.length;
+
+    const meanT = tValues.reduce((s, v) => s + v, 0) / n;
+    const meanY = yValues.reduce((s, v) => s + v, 0) / n;
+
+    let num = 0;
+    let den = 0;
+    for (let i = 0; i < n; i++) {
+      const dt = tValues[i] - meanT;
+      num += dt * (yValues[i] - meanY);
+      den += dt * dt;
+    }
+
+    if (den > 0.0001) {
+      slope = num / den;
+    }
+
+    // Damp slope realistically: clamp to max ±0.2 marks per day (±1.4 marks per week)
+    const MAX_DAILY_SLOPE = 0.2;
+    slope = Math.max(-MAX_DAILY_SLOPE, Math.min(MAX_DAILY_SLOPE, slope));
+  }
+
+  const dayMs = 1000 * 60 * 60 * 24;
+  const daysToExam = (examTime - lastTime) / dayMs;
+
+  // Generate 4 forecast intervals up to exam date (25%, 50%, 75%, 100%)
+  const fractions = [0.25, 0.5, 0.75, 1.0];
+  const forecast = [
+    { x: new Date(lastTime), y: Number(lastPoint.y.toFixed(2)) }
+  ];
+
+  for (const frac of fractions) {
+    const deltaDays = daysToExam * frac;
+    const futureDate = new Date(lastTime + deltaDays * dayMs);
+    let projectedMarks = lastPoint.y + slope * deltaDays;
+
+    // Bounds check [0, 80]
+    projectedMarks = Math.max(0, Math.min(TOTAL_MARKS, projectedMarks));
+
+    forecast.push({
+      x: futureDate,
+      y: Number(projectedMarks.toFixed(2)),
+      isExamDay: frac === 1.0,
+    });
+  }
+
+  return forecast;
+}
+
 // ── Trend Chart ──
 function renderTrendChart(trendData, subjectFilter) {
   const filtered = subjectFilter === 'all'
     ? trendData
     : trendData.filter(r => r.subject === subjectFilter);
 
-  const ctx = document.getElementById('trendChart').getContext('2d');
+  const forecastToggle = document.getElementById('trendForecastToggle');
+  const showForecast = forecastToggle ? forecastToggle.checked : true;
+  const examDate = new Date('2027-02-17T09:00:00+05:30');
 
   // Convert date string to Date object for proper time axis sorting
   function toDate(d) {
@@ -151,23 +268,53 @@ function renderTrendChart(trendData, subjectFilter) {
   }
 
   if (subjectFilter === 'all') {
-    // One dataset per subject
-    const datasets = SUBJECTS.map(subj => {
+    const datasets = [];
+
+    SUBJECTS.forEach(subj => {
       const subjData = filtered.filter(r => r.subject === subj);
-      // Sort by date within each subject
+      if (!subjData.length) return;
+
       subjData.sort((a, b) => toDate(a.date_attempted) - toDate(b.date_attempted));
-      return {
+      const actualPoints = subjData.map(r => ({
+        x: toDate(r.date_attempted),
+        y: parseFloat(r.marks_obtained),
+      }));
+
+      // Actual scores (solid line)
+      datasets.push({
         label: subj,
-        data: subjData.map(r => ({ x: toDate(r.date_attempted), y: parseFloat(r.marks_obtained) })),
+        data: actualPoints,
         borderColor: SUBJECT_COLORS[subj],
         backgroundColor: SUBJECT_COLORS[subj] + '33',
         borderWidth: 2,
         pointRadius: 4,
         pointHoverRadius: 6,
-        tension: 0.4,
+        tension: 0.3,
         fill: false,
-      };
-    }).filter(d => d.data.length > 0);
+      });
+
+      // Forecast trajectory (dashed line)
+      if (showForecast) {
+        const forecastPoints = computeForecastPoints(actualPoints, examDate);
+        if (forecastPoints.length > 1) {
+          datasets.push({
+            label: `${subj} (Forecast)`,
+            data: forecastPoints,
+            borderColor: SUBJECT_COLORS[subj],
+            borderDash: [6, 4],
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointStyle: 'circle',
+            pointBackgroundColor: getCssVar('--surface'),
+            pointBorderColor: SUBJECT_COLORS[subj],
+            pointBorderWidth: 2,
+            tension: 0.1,
+            fill: false,
+          });
+        }
+      }
+    });
 
     renderChart(trendChart, 'trendChart', {
       type: 'line',
@@ -175,19 +322,45 @@ function renderTrendChart(trendData, subjectFilter) {
       options: trendOptions(),
     });
   } else {
-    // Sort by date
+    // Single subject view
     filtered.sort((a, b) => toDate(a.date_attempted) - toDate(b.date_attempted));
+    const actualPoints = filtered.map(r => ({
+      x: toDate(r.date_attempted),
+      y: parseFloat(r.marks_obtained),
+    }));
+
     const datasets = [{
-      label: subjectFilter,
-      data: filtered.map(r => ({ x: toDate(r.date_attempted), y: parseFloat(r.marks_obtained) })),
+      label: `${subjectFilter} (Actual)`,
+      data: actualPoints,
       borderColor: SUBJECT_COLORS[subjectFilter],
-      backgroundColor: SUBJECT_COLORS[subjectFilter] + '33',
+      backgroundColor: SUBJECT_COLORS[subjectFilter] + '26',
       borderWidth: 2.5,
       pointRadius: 5,
       pointHoverRadius: 7,
-      tension: 0.4,
+      tension: 0.3,
       fill: true,
     }];
+
+    if (showForecast) {
+      const forecastPoints = computeForecastPoints(actualPoints, examDate);
+      if (forecastPoints.length > 1) {
+        datasets.push({
+          label: `${subjectFilter} (Forecast)`,
+          data: forecastPoints,
+          borderColor: SUBJECT_COLORS[subjectFilter],
+          borderDash: [6, 4],
+          borderWidth: 2.5,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointStyle: 'circle',
+          pointBackgroundColor: getCssVar('--surface'),
+          pointBorderColor: SUBJECT_COLORS[subjectFilter],
+          pointBorderWidth: 2,
+          tension: 0.1,
+          fill: false,
+        });
+      }
+    }
 
     renderChart(trendChart, 'trendChart', {
       type: 'line',
@@ -201,23 +374,41 @@ function trendOptions() {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
+    interaction: { mode: 'nearest', axis: 'x', intersect: false },
     plugins: {
-      legend: { labels: { color: getCssVar('--text'), font: { family: 'Inter' } } },
+      legend: {
+        labels: {
+          color: getCssVar('--text'),
+          font: { family: 'Inter', size: 11 },
+          usePointStyle: true,
+          boxWidth: 8,
+          boxHeight: 8,
+        },
+      },
       tooltip: {
         backgroundColor: getCssVar('--surface'),
         titleColor: getCssVar('--text'),
         bodyColor: getCssVar('--text-muted'),
         borderColor: getCssVar('--border'),
         borderWidth: 1,
+        padding: 10,
         callbacks: {
           title: function (items) {
             if (items.length && items[0].raw && items[0].raw.x) {
-              return fmtDate(items[0].raw.x);
+              const d = items[0].raw.x;
+              const isExam = items[0].raw.isExamDay;
+              return fmtDate(d) + (isExam ? ' 🎯 (CBSE Exam Day)' : '');
             }
             return '';
-          }
-        }
+          },
+          label: function (context) {
+            const isForecast = context.dataset.label && context.dataset.label.includes('Forecast');
+            const val = context.parsed.y;
+            const pct = ((val / TOTAL_MARKS) * 100).toFixed(1);
+            const prefix = isForecast ? '🔮 Forecast: ' : '📝 Score: ';
+            return `${prefix}${context.dataset.label}: ${val}/80 (${pct}%)`;
+          },
+        },
       },
     },
     scales: {
@@ -641,12 +832,23 @@ function startDelete(id, label) {
 }
 
 // ══════════════════════════════════════════════
-// TREND FILTER
+// TREND FILTER & FORECAST TOGGLE
 // ══════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('trendSubjectFilter').addEventListener('change', e => {
-    renderTrendChart(allTrendData, e.target.value);
-  });
+  const filterEl = document.getElementById('trendSubjectFilter');
+  const toggleEl = document.getElementById('trendForecastToggle');
+
+  if (filterEl) {
+    filterEl.addEventListener('change', e => {
+      renderTrendChart(allTrendData, e.target.value);
+    });
+  }
+
+  if (toggleEl) {
+    toggleEl.addEventListener('change', () => {
+      renderTrendChart(allTrendData, filterEl ? filterEl.value : 'all');
+    });
+  }
 });
 
 // ══════════════════════════════════════════════
