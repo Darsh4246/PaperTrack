@@ -1,16 +1,16 @@
 require('dotenv').config();
 const express = require('express');
-const path    = require('path');
+const path = require('path');
 const { Pool } = require('pg');
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-// ── Gemini config ──────────────────────────────────
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL   = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const AI_CACHE_MIN   = parseInt(process.env.AI_CACHE_MINUTES) || 30;
+// ── OpenRouter config ──────────────────────────────
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openrouter/free';
+const AI_CACHE_MIN = parseInt(process.env.AI_CACHE_MINUTES) || 30;
 
 // ── Separate in-memory AI caches ───────────────────
 const aiCaches = {
@@ -29,9 +29,9 @@ function clearAiCaches() {
 
 // ── DB pool ───────────────────────────────────────
 const pool = new Pool({
-  host:     process.env.DB_HOST,
-  port:     parseInt(process.env.DB_PORT) || 5432,
-  user:     process.env.DB_USER,
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT) || 5432,
+  user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
 });
@@ -51,11 +51,11 @@ app.use(express.static(path.join(__dirname, 'public')));
  */
 function safeParseJSON(str) {
   // 1. First try clean parse
-  try { return JSON.parse(str); } catch (_) {}
+  try { return JSON.parse(str); } catch (_) { }
 
   // 2. Strip trailing commas before ] or }
   let fixed = str.replace(/,\s*([}\]])/g, '$1');
-  try { return JSON.parse(fixed); } catch (_) {}
+  try { return JSON.parse(fixed); } catch (_) { }
 
   // 3. If truncated mid-array or mid-object, close all open brackets
   fixed = repairTruncatedJSON(fixed);
@@ -70,7 +70,7 @@ function safeParseJSON(str) {
 function repairTruncatedJSON(str) {
   const stack = [];
   let inString = false;
-  let escape   = false;
+  let escape = false;
 
   for (let i = 0; i < str.length; i++) {
     const ch = str[i];
@@ -102,10 +102,10 @@ app.get('/api/attempts', async (req, res) => {
     const params = [];
     let idx = 1;
 
-    if (subject)    { query += ` AND subject = $${idx++}`;         params.push(subject); }
-    if (paper_type) { query += ` AND paper_type = $${idx++}`;      params.push(paper_type); }
-    if (date_from)  { query += ` AND date_attempted >= $${idx++}`; params.push(date_from); }
-    if (date_to)    { query += ` AND date_attempted <= $${idx++}`; params.push(date_to); }
+    if (subject) { query += ` AND subject = $${idx++}`; params.push(subject); }
+    if (paper_type) { query += ` AND paper_type = $${idx++}`; params.push(paper_type); }
+    if (date_from) { query += ` AND date_attempted >= $${idx++}`; params.push(date_from); }
+    if (date_to) { query += ` AND date_attempted <= $${idx++}`; params.push(date_to); }
 
     query += ' ORDER BY date_attempted DESC, id DESC';
     const result = await pool.query(query, params);
@@ -214,17 +214,17 @@ app.get('/api/metrics', async (req, res) => {
       `SELECT * FROM paper_attempts ORDER BY date_attempted DESC, id DESC LIMIT 5`
     );
 
-    const best  = await pool.query(`SELECT * FROM paper_attempts ORDER BY marks_obtained DESC LIMIT 1`);
+    const best = await pool.query(`SELECT * FROM paper_attempts ORDER BY marks_obtained DESC LIMIT 1`);
     const worst = await pool.query(`SELECT * FROM paper_attempts ORDER BY marks_obtained ASC  LIMIT 1`);
     const total = await pool.query(`SELECT COUNT(*) AS total FROM paper_attempts`);
 
     res.json({
-      subjectAvg:    subjectAvg.rows,
-      trend:         trend.rows,
-      byPaperType:   byPaperType.rows,
-      recent:        recent.rows,
-      best:          best.rows[0]  || null,
-      worst:         worst.rows[0] || null,
+      subjectAvg: subjectAvg.rows,
+      trend: trend.rows,
+      byPaperType: byPaperType.rows,
+      recent: recent.rows,
+      best: best.rows[0] || null,
+      worst: worst.rows[0] || null,
       totalAttempts: parseInt(total.rows[0].total),
     });
   } catch (err) {
@@ -271,7 +271,7 @@ async function getStudentPerformanceContext() {
   if (!attempts.length) return null;
 
   const attemptsTimeline = attempts.map(a =>
-    `- [${a.date_attempted?.toString().slice(0, 10)}] ${a.subject} | ${a.paper_type} #${a.paper_number}: ${a.marks_obtained}/80 (${a.percentage ?? ((a.marks_obtained/80)*100).toFixed(1)}%) | Notes/Comments: ${a.comments || '(none)'}`
+    `- [${a.date_attempted?.toString().slice(0, 10)}] ${a.subject} | ${a.paper_type} #${a.paper_number}: ${a.marks_obtained}/80 (${a.percentage ?? ((a.marks_obtained / 80) * 100).toFixed(1)}%) | Notes/Comments: ${a.comments || '(none)'}`
   ).join('\n');
 
   const subjectSummaries = subjectAvg.map(s => {
@@ -281,7 +281,7 @@ async function getStudentPerformanceContext() {
 
     const comments = attempts
       .filter(a => a.subject === s.subject && a.comments && a.comments.trim())
-      .map(a => `[${a.paper_type} #${a.paper_number} on ${a.date_attempted?.toString().slice(0,10)}]: "${a.comments.trim()}"`)
+      .map(a => `[${a.paper_type} #${a.paper_number} on ${a.date_attempted?.toString().slice(0, 10)}]: "${a.comments.trim()}"`)
       .join('\n');
 
     return `Subject: ${s.subject}
@@ -294,106 +294,103 @@ ${comments || '(no comments recorded)'}`;
   return { attempts, subjectAvg, attemptsTimeline, subjectSummaries };
 }
 
-async function callGeminiJSON(prompt, maxOutputTokens = 4096) {
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is not configured. Set it in your environment variables.');
-  }
+    async function callOpenRouterJSON(prompt, maxTokens = 4096) {
+      if (!OPENROUTER_API_KEY) {
+        throw new Error('OPENROUTER_API_KEY is not configured. Set it in your environment variables.');
+      }
 
-  console.log(`🤖 Calling Gemini (${GEMINI_MODEL})…`);
+      console.log(`🤖 Calling OpenRouter (${OPENROUTER_MODEL})…`);
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
-  const geminiRes = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY,
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: Math.max(maxOutputTokens, 16384),
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'http://localhost:4000',
+            'X-Title': 'PaperTrack',
+          },
+          body: JSON.stringify({
+            model: OPENROUTER_MODEL,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3,
+            max_tokens: Math.max(maxTokens, 4096),
+            response_format: { type: 'json_object' },
+          }),
+        });
 
-  if (!geminiRes.ok) {
-    const errText = await geminiRes.text();
-    let errDetail = errText;
-    try {
-      const errJson = JSON.parse(errText);
-      errDetail = errJson?.error?.message || errText;
-    } catch (_) {}
-    throw new Error(`Gemini API error ${geminiRes.status}: ${errDetail}`);
-  }
+      if (!orRes.ok) {
+        const errText = await orRes.text();
+        let errDetail = errText;
+        try {
+          const errJson = JSON.parse(errText);
+          errDetail = errJson?.error?.message || errText;
+        } catch (_) { }
+        throw new Error(`OpenRouter API error ${orRes.status}: ${errDetail}`);
+      }
 
-  const geminiData = await geminiRes.json();
-  const candidate = geminiData.candidates?.[0];
-  const rawText = (candidate?.content?.parts || [])
-    .filter(p => !p.thought && typeof p.text === 'string')
-    .map(p => p.text)
-    .join('');
+      const orData = await orRes.json();
+      const choice = orData.choices?.[0];
+      const rawText = choice?.message?.content || choice?.message?.reasoning || '';
 
-  if (!rawText) {
-    const reason = candidate?.finishReason || geminiData.promptFeedback?.blockReason || 'empty response';
-    throw new Error(`Gemini returned no content (${reason}).`);
-  }
+      if (!rawText) {
+        const reason = choice?.finish_reason || 'empty response';
+        throw new Error(`OpenRouter returned no content (${reason}).`);
+      }
 
-  // Strip <think>...</think> blocks if present
-  const cleanText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      // Strip <think>...</think> blocks if present
+      const cleanText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-  // Strip markdown code fences
-  const fenceStripped = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      // Strip markdown code fences
+      const fenceStripped = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
 
-  // Extract JSON object (allow truncated output without closing brace so safeParseJSON can repair it)
-  const firstBrace = fenceStripped.indexOf('{');
-  if (firstBrace === -1) throw new Error('AI returned no valid JSON. Raw: ' + fenceStripped.slice(0, 300));
-  const lastBrace = fenceStripped.lastIndexOf('}');
-  const jsonCandidate = lastBrace > firstBrace
-    ? fenceStripped.slice(firstBrace, lastBrace + 1)
-    : fenceStripped.slice(firstBrace);
+      // Extract JSON object (allow truncated output without closing brace so safeParseJSON can repair it)
+      const firstBrace = fenceStripped.indexOf('{');
+      if (firstBrace === -1) throw new Error('AI returned no valid JSON. Raw: ' + fenceStripped.slice(0, 300));
+      const lastBrace = fenceStripped.lastIndexOf('}');
+      const jsonCandidate = lastBrace > firstBrace
+        ? fenceStripped.slice(firstBrace, lastBrace + 1)
+        : fenceStripped.slice(firstBrace);
 
-  return safeParseJSON(jsonCandidate);
-}
-
-function checkCache(cacheKey, force) {
-  if (!force && aiCaches[cacheKey]) {
-    const ageMs = Date.now() - aiCaches[cacheKey].timestamp;
-    if (ageMs < AI_CACHE_MIN * 60 * 1000) {
-      return aiCaches[cacheKey].data;
-    }
-  }
-  return null;
-}
-
-function setCache(cacheKey, data) {
-  aiCaches[cacheKey] = {
-    data: { ...data, status: 'ok', model: GEMINI_MODEL, cached: false },
-    timestamp: Date.now(),
-  };
-}
-
-// ─────────────────────────────────────────────────
-// 1. GET /api/ai/coach  — General Coaching & Diagnostics
-// ─────────────────────────────────────────────────
-app.get(['/api/ai/coach', '/api/ai-insights'], async (req, res) => {
-  const force = req.query.force === '1';
-  const cached = checkCache('coach', force);
-  if (cached) return res.json({ ...cached, cached: true });
-
-  try {
-    const ctx = await getStudentPerformanceContext();
-    if (!ctx) {
-      return res.json({
-        status: 'no_data',
-        message: 'Add some paper attempts first to get AI insights.',
-        subjects: {},
-        overall: null,
-      });
+      return safeParseJSON(jsonCandidate);
     }
 
-    const prompt = `You are an academic coach for a CBSE Class 10 student (Total marks: 80 per paper).
+    function checkCache(cacheKey, force) {
+      if (!force && aiCaches[cacheKey]) {
+        const ageMs = Date.now() - aiCaches[cacheKey].timestamp;
+        if (ageMs < AI_CACHE_MIN * 60 * 1000) {
+          return aiCaches[cacheKey].data;
+        }
+      }
+      return null;
+    }
+
+    function setCache(cacheKey, data) {
+      aiCaches[cacheKey] = {
+        data: { ...data, status: 'ok', model: OPENROUTER_MODEL, cached: false },
+        timestamp: Date.now(),
+      };
+    }
+
+    // ─────────────────────────────────────────────────
+    // 1. GET /api/ai/coach  — General Coaching & Diagnostics
+    // ─────────────────────────────────────────────────
+    app.get(['/api/ai/coach', '/api/ai-insights'], async (req, res) => {
+      const force = req.query.force === '1';
+      const cached = checkCache('coach', force);
+      if (cached) return res.json({ ...cached, cached: true });
+
+      try {
+        const ctx = await getStudentPerformanceContext();
+        if (!ctx) {
+          return res.json({
+            status: 'no_data',
+            message: 'Add some paper attempts first to get AI insights.',
+            subjects: {},
+            overall: null,
+          });
+        }
+
+        const prompt = `You are an academic coach for a CBSE Class 10 student (Total marks: 80 per paper).
 Grading: ≥72 = A1, ≥64 = A2, ≥56 = B1, ≥48 = B2, <48 = Needs Work.
 
 Student Performance Summary:
@@ -420,30 +417,30 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Only include attempted subjects.`;
 
-    const data = await callGeminiJSON(prompt, 4096);
-    setCache('coach', data);
-    res.json(aiCaches.coach.data);
-  } catch (err) {
-    console.error('Coach AI error:', err.message);
-    res.status(500).json({ status: 'error', message: err.message });
-  }
-});
+        const data = await callOpenRouterJSON(prompt, 4096);
+        setCache('coach', data);
+        res.json(aiCaches.coach.data);
+      } catch (err) {
+        console.error('Coach AI error:', err.message);
+        res.status(500).json({ status: 'error', message: err.message });
+      }
+    });
 
-// ─────────────────────────────────────────────────
-// 2. GET /api/ai/predictions  — Score Predictor
-// ─────────────────────────────────────────────────
-app.get('/api/ai/predictions', async (req, res) => {
-  const force = req.query.force === '1';
-  const cached = checkCache('predictions', force);
-  if (cached) return res.json({ ...cached, cached: true });
+    // ─────────────────────────────────────────────────
+    // 2. GET /api/ai/predictions  — Score Predictor
+    // ─────────────────────────────────────────────────
+    app.get('/api/ai/predictions', async (req, res) => {
+      const force = req.query.force === '1';
+      const cached = checkCache('predictions', force);
+      if (cached) return res.json({ ...cached, cached: true });
 
-  try {
-    const ctx = await getStudentPerformanceContext();
-    if (!ctx) {
-      return res.json({ status: 'no_data', message: 'No attempts to project scores.', predictions: {} });
-    }
+      try {
+        const ctx = await getStudentPerformanceContext();
+        if (!ctx) {
+          return res.json({ status: 'no_data', message: 'No attempts to project scores.', predictions: {} });
+        }
 
-    const prompt = `You are an expert CBSE Class 10 exam statistician.
+        const prompt = `You are an expert CBSE Class 10 exam statistician.
 Analyze the student's attempt curve, considering paper types (Educart vs PYQ) and difficulty progression.
 
 Attempt Timeline:
@@ -469,30 +466,30 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Ensure each attempted subject has an entry.`;
 
-    const data = await callGeminiJSON(prompt, 4096);
-    setCache('predictions', data);
-    res.json(aiCaches.predictions.data);
-  } catch (err) {
-    console.error('Predictions AI error:', err.message);
-    res.status(500).json({ status: 'error', message: err.message });
-  }
-});
+        const data = await callOpenRouterJSON(prompt, 4096);
+        setCache('predictions', data);
+        res.json(aiCaches.predictions.data);
+      } catch (err) {
+        console.error('Predictions AI error:', err.message);
+        res.status(500).json({ status: 'error', message: err.message });
+      }
+    });
 
-// ─────────────────────────────────────────────────
-// 3. GET /api/ai/patterns  — Recurring Mistake Pattern Detector
-// ─────────────────────────────────────────────────
-app.get('/api/ai/patterns', async (req, res) => {
-  const force = req.query.force === '1';
-  const cached = checkCache('patterns', force);
-  if (cached) return res.json({ ...cached, cached: true });
+    // ─────────────────────────────────────────────────
+    // 3. GET /api/ai/patterns  — Recurring Mistake Pattern Detector
+    // ─────────────────────────────────────────────────
+    app.get('/api/ai/patterns', async (req, res) => {
+      const force = req.query.force === '1';
+      const cached = checkCache('patterns', force);
+      if (cached) return res.json({ ...cached, cached: true });
 
-  try {
-    const ctx = await getStudentPerformanceContext();
-    if (!ctx) {
-      return res.json({ status: 'no_data', message: 'No attempts recorded.', patterns: [] });
-    }
+      try {
+        const ctx = await getStudentPerformanceContext();
+        if (!ctx) {
+          return res.json({ status: 'no_data', message: 'No attempts recorded.', patterns: [] });
+        }
 
-    const prompt = `You are an academic diagnostic analyzer for a CBSE Class 10 student.
+        const prompt = `You are an academic diagnostic analyzer for a CBSE Class 10 student.
 Your task is to detect recurring blind spots, persistent error patterns, and repeat mistakes by cross-referencing all paper comments and weaknesses.
 
 Attempts & Notes:
@@ -516,30 +513,30 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Provide 3 to 5 realistic, high-impact recurring patterns.`;
 
-    const data = await callGeminiJSON(prompt, 4096);
-    setCache('patterns', data);
-    res.json(aiCaches.patterns.data);
-  } catch (err) {
-    console.error('Patterns AI error:', err.message);
-    res.status(500).json({ status: 'error', message: err.message });
-  }
-});
+        const data = await callOpenRouterJSON(prompt, 4096);
+        setCache('patterns', data);
+        res.json(aiCaches.patterns.data);
+      } catch (err) {
+        console.error('Patterns AI error:', err.message);
+        res.status(500).json({ status: 'error', message: err.message });
+      }
+    });
 
-// ─────────────────────────────────────────────────
-// 4. GET /api/ai/planner  — 7-Day Adaptive AI Study Plan
-// ─────────────────────────────────────────────────
-app.get('/api/ai/planner', async (req, res) => {
-  const force = req.query.force === '1';
-  const cached = checkCache('planner', force);
-  if (cached) return res.json({ ...cached, cached: true });
+    // ─────────────────────────────────────────────────
+    // 4. GET /api/ai/planner  — 7-Day Adaptive AI Study Plan
+    // ─────────────────────────────────────────────────
+    app.get('/api/ai/planner', async (req, res) => {
+      const force = req.query.force === '1';
+      const cached = checkCache('planner', force);
+      if (cached) return res.json({ ...cached, cached: true });
 
-  try {
-    const ctx = await getStudentPerformanceContext();
-    if (!ctx) {
-      return res.json({ status: 'no_data', message: 'No attempts recorded.', planner: [] });
-    }
+      try {
+        const ctx = await getStudentPerformanceContext();
+        if (!ctx) {
+          return res.json({ status: 'no_data', message: 'No attempts recorded.', planner: [] });
+        }
 
-    const prompt = `You are a study schedule planner for a CBSE Class 10 student preparing for board exams.
+        const prompt = `You are a study schedule planner for a CBSE Class 10 student preparing for board exams.
 Create a focused 7-day adaptive revision timetable that prioritizes the student's weakest subjects and topics identified from their attempts.
 
 Attempts & Notes:
@@ -567,22 +564,22 @@ Produce raw JSON with EXACTLY this structure (no markdown, no extra text):
 }
 Generate 5 to 7 daily sessions. Keep tasks concrete and actionable.`;
 
-    const data = await callGeminiJSON(prompt, 4096);
-    setCache('planner', data);
-    res.json(aiCaches.planner.data);
-  } catch (err) {
-    console.error('Planner AI error:', err.message);
-    res.status(500).json({ status: 'error', message: err.message });
-  }
-});
+        const data = await callOpenRouterJSON(prompt, 4096);
+        setCache('planner', data);
+        res.json(aiCaches.planner.data);
+      } catch (err) {
+        console.error('Planner AI error:', err.message);
+        res.status(500).json({ status: 'error', message: err.message });
+      }
+    });
 
-// ── Serve index.html for all other routes ─────────
-app.get('/{*path}', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+    // ── Serve index.html for all other routes ─────────
+    app.get('/{*path}', (req, res) => {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    });
 
-app.listen(PORT, HOST, () => {
-  console.log(`✅ Paper Attempts tracker running at http://localhost:${PORT}`);
-  console.log(`🌐 Network accessible at http://${HOST}:${PORT}`);
-  console.log(`🤖 AI model: ${GEMINI_MODEL} via Google Gemini API`);
-});
+    app.listen(PORT, HOST, () => {
+      console.log(`✅ Paper Attempts tracker running at http://localhost:${PORT}`);
+      console.log(`🌐 Network accessible at http://${HOST}:${PORT}`);
+      console.log(`🤖 AI model: ${OPENROUTER_MODEL} via OpenRouter API`);
+    });

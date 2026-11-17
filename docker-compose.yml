@@ -17,8 +17,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD}
       - DB_NAME=${DB_NAME:?set DB_NAME}
 
-      - GEMINI_API_KEY=${GEMINI_API_KEY:?set GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openrouter/free}
       - AI_CACHE_MINUTES=${AI_CACHE_MINUTES:?set AI_CACHE_MINUTES}
     volumes:
       - postgres_data:/var/lib/postgresql/data
